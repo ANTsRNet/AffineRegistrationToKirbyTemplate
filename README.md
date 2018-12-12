@@ -24,3 +24,10 @@ sets CPU - comment this out in the src/xxx.R to use GPU.
 
 THIS IS A WIP - SUBJECT TO ADDITIONAL NETWORK TRAINING
 
+NOTES:
+
+* could be much faster if we just did a quick CoM alignment - but this likely wont generalize as well
+
+* should implement a batch mode to take advantage of the GPU
+
+
