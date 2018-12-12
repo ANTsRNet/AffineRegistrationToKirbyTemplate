@@ -1,2 +1,26 @@
 # AffineRegistrationToKirbyTemplate
+
 Register whole head data to the symmetric kirby template
+
+if you run Rscript Scripts/affine2kirby.R image.nii.gz /tmp/ARSE
+the script will output:
+
+* /tmp/ARSE0GenericAffine.mat  - translation tx
+
+* /tmp/ARSElearnedAffine.nii.gz  - affine transformed image
+
+* /tmp/ARSEview[1,2].png  - images to help review results
+
+* /tmp/ARSElearnedAffine.mat - affine tx
+
+
+Note: 
+
+```
+Sys.setenv("CUDA VISIBLE DEVICES"=-1)
+```
+
+sets CPU - comment this out in the src/xxx.R to use GPU.
+
+THIS IS A WIP - SUBJECT TO ADDITIONAL NETWORK TRAINING
+
