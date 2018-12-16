@@ -67,6 +67,7 @@ rdir = "./"
 templateH = antsImageRead( paste0( rdir, "Data/S_template3.nii.gz"))
 templateSeg = antsImageRead( paste0( rdir, "Data/S_template_BrainCerebellum-malf_6Labels.nii.gz"))
 template = templateH * thresholdImage( templateSeg, 1, 6 )
+brainSeg=thresholdImage( templateSeg, 1, 6 )
 normimg <-function( img, scl=4 ) {
   iMath( img  %>% iMath( "PadImage", 0 ), "Normalize" ) %>%
     resampleImage( 4  )
@@ -105,15 +106,14 @@ writeAntsrTransform( invertAntsrTransform( affTx ), affmat )
 
 affout = paste0( outputFileName, "learnedAffine.nii.gz" )
 tx = c( affmat, treg$fwdtransforms )
-learnedi = antsApplyTransforms( templateH, tarimg, tx[1] )
+learnedi = antsApplyTransforms( templateH, newimg, tx )
 antsImageWrite( learnedi, affout )
 
-print( antsImageMutualInformation( template, tarimg ) )
-print( antsImageMutualInformation( template, learnedi ) )
+# print( antsImageMutualInformation( template, tarimg*brainSeg ) )
+# print( antsImageMutualInformation( template, learnedi*brainSeg ) )
 fignms = paste0( outputFileName, c("view1.png", "view2.png" ) )
 plot( learnedi*100*1, template, outname=fignms[1], doCropping=F, nslices=20, ncolumns=5 , alpha=0.5 , axis=3, quality = 0.5 )
 plot( learnedi*100*1, template, outname=fignms[2], doCropping=F, nslices=20, ncolumns=5 , alpha=0.5 , axis=2,quality = 0.5 )
-
 q("no")
 plot(  refH, doCropping=F, nslices=20, ncolumns=5 , alpha=0.5 , axis=2 )
 dreg = antsRegistration( templateH, tarimg, "SyNOnly", initialTransform =  invertAntsrTransform( affTx ) )
