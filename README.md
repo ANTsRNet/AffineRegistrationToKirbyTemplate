@@ -14,6 +14,12 @@ the script will output:
 * /tmp/ARSElearnedAffine.mat - affine tx
 
 
+To register a brain image ( ie brain after brain extraction ):
+
+```
+Rscript Scripts/affinebrain2kirby.R Data/0028442_DLBS_brain.nii.gz /tmp/ARSE
+```
+
 Note: 
 
 ```
