@@ -66,7 +66,7 @@ myarr = array( dim = c( ntx, dim( refH ), 1 ) )
 xfrmList = list()
 txmat = matrix( 0, nrow=ntx, ncol=3 )
 for ( k in 1:ntx ) {
-  if ( k > 1 ) txmat[k,]  = rnorm(3,0,1)*antsGetSpacing(template)
+  if ( k > 1 ) txmat[k,]  = rnorm(3,0,5)*antsGetSpacing(template)
   xfrm <- createAntsrTransform( type = "Euler3DTransform",
       center = centerOfMassTemplate,
       translation = centerOfMassImage - centerOfMassTemplate + txmat[k,] )
