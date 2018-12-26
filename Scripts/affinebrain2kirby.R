@@ -5,7 +5,46 @@ library( ANTsRNet )
 library( ANTsR )
 library(keras)
 library( tensorflow )
-doresnet = T # FALSE
+doresnet = FALSE
+
+
+build_vbm <- function( input_shape, num_regressors, dilrt = 1,
+  myact='linear', drate = 0.0 ) {
+  filtSz1 = 32
+  filtSz2 = 32
+  dilrt = as.integer( dilrt )
+  ksz = c(3,3,3)
+  ks2 = c(1,1,1)
+  psz = c(2,2,2)
+  model <- keras_model_sequential() %>%
+  # 1.a
+    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
+      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
+    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
+      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
+    layer_max_pooling_3d(pool_size = psz, padding='valid') %>%
+  # 1.b
+    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
+      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
+    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
+      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
+    layer_max_pooling_3d(pool_size = psz, padding='valid') %>%
+    # 2nd set of filter sizes
+      layer_conv_3d(filters = filtSz2, kernel_size = ksz, activation = myact,
+        input_shape = input_shape, dilation_rate = dilrt, padding='same' ) %>%
+      layer_conv_3d(filters = filtSz2, kernel_size = ksz, activation = myact,
+        input_shape = input_shape, dilation_rate = dilrt, padding='same' ) %>%
+      layer_max_pooling_3d(pool_size = psz, padding='same') %>%
+    # final  prediction layers
+    layer_flatten() %>%
+    layer_global_average_pooling_3d %>%
+    layer_dense(units = 1024, activation = myact) %>%
+    layer_dense(units = num_regressors )
+
+model
+}
+
+
 # closer to "real" homography net but trimmed for this input size
 build_model <- function( input_shape, num_regressors, dilrt = 1,
   myact='relu', drate = 0.0 ) {
@@ -55,6 +94,7 @@ model
 }
 
 
+
 args <- commandArgs( trailingOnly = TRUE )
 dlbsid = "28400"
 dlbsid = "28498"
@@ -87,23 +127,18 @@ normimg <-function( img, scl=4 ) {
     resampleImage( 4  )
 }
 
-numRegressors = 12
+numRegressors = 10
 refH = normimg( template )
 input_shape <- c( dim( refH ), refH@components )
 
-if ( doresnet ) {
-  regressionModel <- createResNetModel3D( input_shape, numRegressors,
-      layers=1:4, lowestResolution = 16,
-      mode = 'regression' )
+regressionModel = load_model_hdf5( "./Data/regiwDeformationBasisalg_Brain2_scl4regressionModel.h5" )
 
-  load_model_weights_hdf5( regressionModel, paste0( rdir, "Data/brainAffinealgResNetscl4regressionModel.h5" ) )
-  } else {
-  regressionModel <- build_model( input_shape, numRegressors )
-  load_model_weights_hdf5( regressionModel, paste0( rdir, "Data/brainAffinealg_HN_scl4regressionModel.h5" ) )
-}
+basis = data.matrix( read.csv( "Data/regiwDeformationBasisalg_Brain_scl4regressionModelbasis.csv" ) )
+mns = as.numeric( read.csv( "Data/regiwDeformationBasisalg_Brain_scl4regressionModelmn.csv" )[,1] )
 newimg = antsImageRead( inputFileName ) %>% iMath("Normalize")
 centerOfMassTemplate <- getCenterOfMass( template )
 centerOfMassTemplate = c( 101.3143, 140.8385, 140.7970 ) # this was used in training
+# 101.3280 140.9331 140.7518
 centerOfMassImage <- getCenterOfMass( newimg )
 xfrm <- createAntsrTransform( type = "Euler3DTransform",
   center = centerOfMassTemplate,
@@ -111,11 +146,15 @@ xfrm <- createAntsrTransform( type = "Euler3DTransform",
 tarimg = applyAntsrTransformToImage( xfrm, newimg, template )
 nimg = normimg( tarimg, scl=scl )
 nimgarr = array( as.array(nimg), dim = c(1, dim(refH), 1) )
+nimgarr2 = array( as.array(nimg)-as.array(refH), dim = c(1, dim(refH), 1) )
+# predParams = regressionModel %>% predict( list(nimgarr,nimgarr2), verbose = 1 )
 predParams = regressionModel %>% predict( nimgarr, verbose = 1 )
-inp = predParams[1,]
+
+inp =  basis %*% ( mns +  predParams[1,] )
 affTx = createAntsrTransform( "AffineTransform", dimension = 3 )
 setAntsrTransformFixedParameters( affTx, centerOfMassTemplate[1:3] )
 setAntsrTransformParameters( affTx, inp )
+affTx = invertAntsrTransform( affTx )
 trnmat = paste0( outputFileName, "translation.mat" )
 writeAntsrTransform( xfrm, trnmat )
 affmat = paste0( outputFileName, "learnedAffine.mat" )
@@ -135,19 +174,19 @@ print( fignms )
 myq = 0.8
 plot( learnedi2*100*1, template, outname=fignms[1], doCropping=T, nslices=20, ncolumns=5 , alpha=0.5 , axis=3, quality = myq )
 plot( learnedi2*100*1, template, outname=fignms[2], doCropping=T, nslices=20, ncolumns=5 , alpha=0.5 , axis=2,quality = myq )
-# print("done")
-# q("no")
+print("done")
+q("no")
 
 # derka
 
 # do a voting type of thing
 set.seed(1)
-ntx = 11
+ntx = 22
 myarr = array( dim = c( ntx, dim( refH ), 1 ) )
 xfrmList = list()
 txmat = matrix( 0, nrow=ntx, ncol=3 )
 for ( k in 1:ntx ) {
-  if ( k > 1 ) txmat[k,]  = rnorm(3,0,0.5)*antsGetSpacing(template)
+  if ( k > 1 ) txmat[k,]  = rnorm(3,0,0.02)*antsGetSpacing(template)
   xfrm <- createAntsrTransform( type = "Euler3DTransform",
       center = centerOfMassTemplate,
       translation = centerOfMassImage - centerOfMassTemplate + txmat[k,] )
@@ -200,6 +239,15 @@ myq = 0.8
 plot( learnedi*100*1, template, outname=fignms[1], doCropping=T, nslices=20, ncolumns=5 , alpha=0.5 , axis=3, quality = myq )
 plot( learnedi*100*1, template, outname=fignms[2], doCropping=T, nslices=20, ncolumns=5 , alpha=0.5 , axis=2,quality = myq )
 print("done")
+
+dreg = antsRegistration( template, newimg, "Affine" )
+
+print( antsImageMutualInformation( template, dreg$warpedmovout ) )
+
+dreg = antsRegistration( refH, newimg, "Affine" )
+
+print( antsImageMutualInformation( refH, dreg$warpedmovout ) )
+
 
 # aderkaea
 q("no")
