@@ -5,104 +5,11 @@ library( ANTsRNet )
 library( ANTsR )
 library(keras)
 library( tensorflow )
-doresnet = FALSE
-
-
-build_vbm <- function( input_shape, num_regressors, dilrt = 1,
-  myact='linear', drate = 0.0 ) {
-  filtSz1 = 32
-  filtSz2 = 32
-  dilrt = as.integer( dilrt )
-  ksz = c(3,3,3)
-  ks2 = c(1,1,1)
-  psz = c(2,2,2)
-  model <- keras_model_sequential() %>%
-  # 1.a
-    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
-      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
-    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
-      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
-    layer_max_pooling_3d(pool_size = psz, padding='valid') %>%
-  # 1.b
-    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
-      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
-    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
-      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
-    layer_max_pooling_3d(pool_size = psz, padding='valid') %>%
-    # 2nd set of filter sizes
-      layer_conv_3d(filters = filtSz2, kernel_size = ksz, activation = myact,
-        input_shape = input_shape, dilation_rate = dilrt, padding='same' ) %>%
-      layer_conv_3d(filters = filtSz2, kernel_size = ksz, activation = myact,
-        input_shape = input_shape, dilation_rate = dilrt, padding='same' ) %>%
-      layer_max_pooling_3d(pool_size = psz, padding='same') %>%
-    # final  prediction layers
-    layer_flatten() %>%
-    layer_global_average_pooling_3d %>%
-    layer_dense(units = 1024, activation = myact) %>%
-    layer_dense(units = num_regressors )
-
-model
-}
-
-
-# closer to "real" homography net but trimmed for this input size
-build_model <- function( input_shape, num_regressors, dilrt = 1,
-  myact='relu', drate = 0.0 ) {
-  filtSz1 = 64
-  filtSz2 = 128
-  dilrt = as.integer( dilrt )
-  ksz = c(3,3,3)
-  psz = c(2,2,2)
-  model <- keras_model_sequential() %>%
-  # first set of filter sizes
-  # 1.a
-    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
-      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
-    layer_batch_normalization() %>%
-    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
-      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
-    layer_batch_normalization() %>%
-    layer_max_pooling_3d(pool_size = psz, padding='valid') %>%
-  # 1.b
-    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
-      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
-    layer_batch_normalization() %>%
-    layer_conv_3d(filters = filtSz1, kernel_size = ksz, activation = myact,
-      input_shape = input_shape, dilation_rate = dilrt, padding='valid' ) %>%
-    layer_batch_normalization() %>%
-    layer_max_pooling_3d(pool_size = psz, padding='valid') %>%
-    # 2nd set of filter sizes
-      layer_conv_3d(filters = filtSz2, kernel_size = ksz, activation = myact,
-        input_shape = input_shape, dilation_rate = dilrt, padding='same' ) %>%
-      layer_batch_normalization() %>%
-      layer_conv_3d(filters = filtSz2, kernel_size = ksz, activation = myact,
-        input_shape = input_shape, dilation_rate = dilrt, padding='same' ) %>%
-      layer_batch_normalization() %>%
-      layer_max_pooling_3d(pool_size = psz, padding='same') %>%
-      layer_conv_3d(filters = filtSz2, kernel_size = ksz, activation = myact,
-        input_shape = input_shape, dilation_rate = dilrt, padding='same' ) %>%
-      layer_batch_normalization() %>%
-      layer_conv_3d(filters = filtSz2, kernel_size = ksz, activation = myact,
-        input_shape = input_shape, dilation_rate = dilrt, padding='same' ) %>%
-      layer_batch_normalization() %>%
-    # final  prediction layers
-    layer_flatten() %>%
-    layer_dense(units = 1024, activation = myact) %>%
-    layer_dense(units = num_regressors )
-
-model
-}
-
-
 
 args <- commandArgs( trailingOnly = TRUE )
 dlbsid = "28400"
 dlbsid = "28498"
 dlbsid = "28640"
-# for testing
-# infn = paste0("/home/avants/data/DLBS/organized_imaging_data/00", dlbsid, "/session_1/anat_1/anat.nii.gz" )
-# infn="/home/avants/code/AffineRegistrationToKirbyTemplate/Data/0028442_DLBS_brain.nii.gz"
-# args = c( infn,  "/tmp/temp" )
 if( length( args ) != 2 )
   {
   helpMessage <- paste0( "Usage:  Rscript affinebrain2kirby.R",
@@ -114,8 +21,6 @@ if( length( args ) != 2 )
   }
 
 print( inputFileName )
-
-# this is based on homography net but trimmed for this input size
 
 rdir = "./"
 templateH = antsImageRead( paste0( rdir, "Data/S_template3.nii.gz"))
@@ -130,9 +35,7 @@ normimg <-function( img, scl=4 ) {
 numRegressors = 10
 refH = normimg( template )
 input_shape <- c( dim( refH ), refH@components )
-
 regressionModel = load_model_hdf5( "./Data/regiwDeformationBasisalg_Brain2_scl4regressionModel.h5" )
-
 basis = data.matrix( read.csv( "Data/regiwDeformationBasisalg_Brain_scl4regressionModelbasis.csv" ) )
 mns = as.numeric( read.csv( "Data/regiwDeformationBasisalg_Brain_scl4regressionModelmn.csv" )[,1] )
 newimg = antsImageRead( inputFileName ) %>% iMath("Normalize")
@@ -196,11 +99,11 @@ for ( k in 1:ntx ) {
   xfrmList[[k]] = xfrm
   }
 predParams = regressionModel %>% predict( myarr, verbose = 1 )
-pcaReconCoeffsMeans = read.csv( paste0( rdir, "Data/brainAffinealgResNetscl4regressionModelmn.csv" ) )[,1]
 bestk=0
 for ( k in 1:ntx ) {
-  inp = predParams[k,] + pcaReconCoeffsMeans *0 # predicted solution
-  if ( k == 1 ) inp = colMeans( predParams ) + pcaReconCoeffsMeans * 0
+#  inp = predParams[k,] + mns # predicted solution
+  inp =  basis %*% ( mns +  predParams[k,] )
+  if ( k == 1 ) inp = basis %*% ( colMeans( predParams ) + mns )
   affTx = createAntsrTransform( "AffineTransform", dimension = 3 )
   setAntsrTransformFixedParameters( affTx, centerOfMassTemplate )
   setAntsrTransformParameters( affTx, inp )
@@ -217,8 +120,8 @@ for ( k in 1:ntx ) {
 ##############################################
 print( paste( 'bestk',bestk,'bestmi',bestmi) )
 k=bestk
-inp = predParams[k,] + pcaReconCoeffsMeans * 0 # predicted solution
-if ( k == 1 ) inp = colMeans( predParams ) + pcaReconCoeffsMeans *0 
+inp =  basis %*% ( mns +  predParams[k,] )
+if ( k == 1 ) inp = basis %*% ( colMeans( predParams ) + mns )
 affTx = createAntsrTransform( "AffineTransform", dimension = 3 )
 setAntsrTransformFixedParameters( affTx, centerOfMassTemplate )
 setAntsrTransformParameters( affTx, inp )
@@ -232,13 +135,15 @@ tx = c( affmat, trnmat )
 learnedi = antsApplyTransforms( templateH, newimg, tx )
 antsImageWrite( learnedi, affout )
 
-
+if ( TRUE ) {
 fignms = paste0( outputFileName, c("view1v.png", "view2v.png" ) )
 print( fignms ) 
 myq = 0.8
 plot( learnedi*100*1, template, outname=fignms[1], doCropping=T, nslices=20, ncolumns=5 , alpha=0.5 , axis=3, quality = myq )
 plot( learnedi*100*1, template, outname=fignms[2], doCropping=T, nslices=20, ncolumns=5 , alpha=0.5 , axis=2,quality = myq )
 print("done")
+}
+q("no")
 
 dreg = antsRegistration( template, newimg, "Affine" )
 
