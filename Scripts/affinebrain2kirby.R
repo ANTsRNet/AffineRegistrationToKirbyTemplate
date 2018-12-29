@@ -10,14 +10,16 @@ args <- commandArgs( trailingOnly = TRUE )
 dlbsid = "28400"
 dlbsid = "28498"
 dlbsid = "28640"
-if( length( args ) != 2 )
+nTries = 10
+if( length( args ) < 2 )
   {
   helpMessage <- paste0( "Usage:  Rscript affinebrain2kirby.R",
-    " imageFile.ext outputPrefix \n will output matrix and transformed image" )
+    " imageFile.ext outputPrefix nTries \n will output matrix and transformed image" )
   stop( helpMessage )
   } else {
   inputFileName <- args[1]
   outputFileName <- args[2]
+  if ( length( args  ) > 2 ) nTries = as.numeric( args[3] )
   }
 
 print( inputFileName )
@@ -58,11 +60,10 @@ xfrm <- createAntsrTransform( type = "Euler3DTransform",
   translation = centerOfMassImage - centerOfMassTemplate )
 
 # do a voting type of thing
-ntx = 50
-myarr = array( dim = c( ntx, dim( refH ), 1 ) )
+myarr = array( dim = c( nTries, dim( refH ), 1 ) )
 xfrmList = list()
-txmat = matrix( 0, nrow=ntx, ncol=3 )
-for ( k in 1:ntx ) {
+txmat = matrix( 0, nrow=nTries, ncol=3 )
+for ( k in 1:nTries ) {
   if ( k > 1 ) txmat[k,]  = rnorm(3,0,0.02)*antsGetSpacing(template)
   xfrm <- createAntsrTransform( type = "Euler3DTransform",
       center = centerOfMassTemplate,
@@ -73,10 +74,10 @@ for ( k in 1:ntx ) {
   xfrmList[[k]] = xfrm
   }
 predParams = regressionModel %>% predict( myarr, verbose = 1,
-  batch_size = round(ntx/2) )
+  batch_size = round(nTries/2) )
 bestk=0
 bestmi=Inf
-for ( k in 1:ntx ) {
+for ( k in 1:nTries ) {
   inp =  basis %*% ( mns +  predParams[k,] )
 #  if ( k == 1 ) inp =  basis %*% ( mns +  colMeans( predParams ) )
   affTx = createAntsrTransform( "AffineTransform", dimension = 3 )
